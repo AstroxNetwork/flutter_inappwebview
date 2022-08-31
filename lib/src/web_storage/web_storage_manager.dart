@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/services.dart';
 
+import '../types.dart';
 import '_static_channel.dart';
 import 'android/web_storage_manager.dart';
 import 'ios/web_storage_manager.dart';
@@ -30,4 +32,18 @@ class WebStorageManager {
   }
 
   static Future<dynamic> _handleMethod(MethodCall call) async {}
+
+  Future<void> clearAll() async {
+    if (Platform.isAndroid) {
+      await android.deleteAllData();
+    } else if (Platform.isIOS) {
+      final data = await ios.fetchDataRecords(
+        dataTypes: IOSWKWebsiteDataType.values,
+      );
+      await ios.removeDataFor(
+        dataTypes: IOSWKWebsiteDataType.values,
+        dataRecords: data,
+      );
+    }
+  }
 }
