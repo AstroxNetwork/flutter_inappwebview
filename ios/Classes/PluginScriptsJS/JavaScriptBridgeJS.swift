@@ -33,7 +33,7 @@ window.\(JAVASCRIPT_BRIDGE_NAME).callHandler = function() {
 \(UTIL_JS_SOURCE)
 """
 
-let PLATFORM_READY_JS_SOURCE = "window.dispatchEvent(new Event('flutterInAppWebViewPlatformReady'));";
+let PLATFORM_READY_JS_SOURCE = "window.dispatchEvent(new Event('AstroXWebViewReady'));";
 
 let JAVASCRIPT_UTIL_VAR_NAME = "window.\(JAVASCRIPT_BRIDGE_NAME)._Util"
 
