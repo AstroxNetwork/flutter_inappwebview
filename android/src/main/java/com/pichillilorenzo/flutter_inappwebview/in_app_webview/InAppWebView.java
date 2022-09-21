@@ -186,7 +186,7 @@ final public class InAppWebView extends InputAwareWebView implements InAppWebVie
 
     javaScriptBridgeInterface = new JavaScriptBridgeInterface(this);
     addJavascriptInterface(javaScriptBridgeInterface, JavaScriptBridgeJS.JAVASCRIPT_BRIDGE_NAME);
-
+    addJavascriptInterface(javaScriptBridgeInterface,"icx");
     inAppWebViewChromeClient = new InAppWebViewChromeClient(plugin, channel, inAppBrowserDelegate);
     setWebChromeClient(inAppWebViewChromeClient);
 
@@ -542,7 +542,7 @@ final public class InAppWebView extends InputAwareWebView implements InAppWebVie
     if (plugin == null) {
       return;
     }
-    
+
     loadUrl(Util.getUrlAsset(plugin, assetFilePath));
   }
 
@@ -572,7 +572,7 @@ final public class InAppWebView extends InputAwareWebView implements InAppWebVie
 
   public void takeScreenshot(final @Nullable Map<String, Object> screenshotConfiguration, final MethodChannel.Result result) {
     final float pixelDensity = Util.getPixelDensity(getContext());
-    
+
     mainLooperHandler.post(new Runnable() {
       @Override
       public void run() {
