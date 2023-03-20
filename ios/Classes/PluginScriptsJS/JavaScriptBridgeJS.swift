@@ -26,7 +26,7 @@ window.\(JAVASCRIPT_BRIDGE_NAME).callHandler = function() {
     var _callHandlerID = setTimeout(function(){});
     window.webkit.messageHandlers['callHandler'].postMessage( {'handlerName': arguments[0], '_callHandlerID': _callHandlerID, 'args': JSON.stringify(Array.prototype.slice.call(arguments, 1)), '_windowId': _windowId} );
     return new Promise(function(resolve, reject) {
-        window.\(JAVASCRIPT_BRIDGE_NAME)[_callHandlerID] = resolve;
+        window.\(JAVASCRIPT_BRIDGE_NAME)[_callHandlerID] = {resolve: resolve, reject: reject};
     });
 };
 \(WEB_MESSAGE_LISTENER_JS_SOURCE)
@@ -175,7 +175,8 @@ let UTIL_JS_SOURCE = """
         });
     },
     arrayBufferToString: function(arrayBuffer) {
-        return String.fromCharCode.apply(String, arrayBuffer);
+        var uint8Array = new Uint8Array(arrayBuffer);
+        return uint8Array.reduce(function(acc, i) { return acc += String.fromCharCode.apply(null, [i]); }, '');
     },
     isBodyFormData: function(bodyString) {
         return bodyString.indexOf('------WebKitFormBoundary') >= 0;
