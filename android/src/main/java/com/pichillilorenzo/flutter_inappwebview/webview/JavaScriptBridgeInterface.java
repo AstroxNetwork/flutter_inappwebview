@@ -24,7 +24,7 @@ import org.json.JSONObject;
 public class JavaScriptBridgeInterface {
   private static final String LOG_TAG = "JSBridgeInterface";
   private InAppWebView inAppWebView;
-  
+
   public JavaScriptBridgeInterface(InAppWebView inAppWebView) {
     this.inAppWebView = inAppWebView;
   }
@@ -130,7 +130,7 @@ public class JavaScriptBridgeInterface {
                 return;
               }
               String sourceCode = "if (window." + JavaScriptBridgeJS.JAVASCRIPT_BRIDGE_NAME + "[" + _callHandlerID + "] != null) { " +
-                "window." + JavaScriptBridgeJS.JAVASCRIPT_BRIDGE_NAME + "[" + _callHandlerID + "].resolve(" + json + "); " +
+                "window." + JavaScriptBridgeJS.JAVASCRIPT_BRIDGE_NAME + "[" + _callHandlerID + "](" + json + "); " +
                 "delete window." + JavaScriptBridgeJS.JAVASCRIPT_BRIDGE_NAME + "[" + _callHandlerID + "]; " +
               "}";
               if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
@@ -152,7 +152,7 @@ public class JavaScriptBridgeInterface {
               }
 
               String sourceCode = "if (window." + JavaScriptBridgeJS.JAVASCRIPT_BRIDGE_NAME + "[" + _callHandlerID + "] != null) { " +
-                      "window." + JavaScriptBridgeJS.JAVASCRIPT_BRIDGE_NAME + "[" + _callHandlerID + "].reject(new Error(" + JSONObject.quote(message) + ")); " +
+                      "window." + JavaScriptBridgeJS.JAVASCRIPT_BRIDGE_NAME + "[" + _callHandlerID + "](new Error(" + JSONObject.quote(message) + ")); " +
                       "delete window." + JavaScriptBridgeJS.JAVASCRIPT_BRIDGE_NAME + "[" + _callHandlerID + "]; " +
                       "}";
               if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
