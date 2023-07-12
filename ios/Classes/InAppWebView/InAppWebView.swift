@@ -17,6 +17,7 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
     static var METHOD_CHANNEL_NAME_PREFIX = "com.pichillilorenzo/flutter_inappwebview_"
 
     var id: Any? // viewId
+    var plugin: SwiftFlutterPlugin?
     var windowId: Int64?
     var windowCreated = false
     var inAppBrowserDelegate: InAppBrowserDelegate?
@@ -60,20 +61,18 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
 
     var customIMPs: [IMP] = []
 
-    static var windowWebViews: [Int64:WebViewTransport] = [:]
-    static var windowAutoincrementId: Int64 = 0;
-
     var callAsyncJavaScriptBelowIOS14Results: [String:((Any?) -> Void)] = [:]
 
     var oldZoomScale = Float(1.0)
 
-    init(id: Any?, registrar: FlutterPluginRegistrar?, frame: CGRect, configuration: WKWebViewConfiguration,
+    init(id: Any?, plugin: SwiftFlutterPlugin?, frame: CGRect, configuration: WKWebViewConfiguration,
          contextMenu: [String: Any]?, userScripts: [UserScript] = []) {
         super.init(frame: frame, configuration: configuration)
         self.id = id
-        if let id = id, let registrar = registrar {
+        self.plugin = plugin
+        if let id = id, let registrar = plugin?.registrar {
             let channel = FlutterMethodChannel(name: InAppWebView.METHOD_CHANNEL_NAME_PREFIX + String(describing: id),
-                                           binaryMessenger: registrar.messenger())
+                                               binaryMessenger: registrar.messenger())
             self.channelDelegate = WebViewChannelDelegate(webView: self, channel: channel)
         }
         self.contextMenu = contextMenu
@@ -224,6 +223,11 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
                     if !self.responds(to: Selector(targetMethodName)) {
                         let customAction: () -> Void = {
                             self.channelDelegate?.onContextMenuActionItemClicked(id: id, title: title)
+                            if #available(iOS 16.0, *) {
+                                if #unavailable(iOS 16.4) {
+                                    self.onHideContextMenu()
+                                }
+                            }
                         }
                         let castedCustomAction: AnyObject = unsafeBitCast(customAction as @convention(block) () -> Void, to: AnyObject.self)
                         let swizzledImplementation = imp_implementationWithBlock(castedCustomAction)
@@ -239,12 +243,50 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
         return super.hitTest(point, with: event)
     }
 
+    @available(iOS 13.0, *)
+    public override func buildMenu(with builder: UIMenuBuilder) {
+        if #available(iOS 16.0, *) {
+            if let menu = contextMenu {
+                let contextMenuSettings = ContextMenuSettings()
+                if let contextMenuSettingsMap = menu["settings"] as? [String: Any?] {
+                    let _ = contextMenuSettings.parse(settings: contextMenuSettingsMap)
+                    if contextMenuSettings.hideDefaultSystemContextMenuItems {
+                        builder.remove(menu: .lookup)
+                    }
+                }
+            }
+
+            if #unavailable(iOS 16.4), settings?.disableContextMenu == false {
+                contextMenuIsShowing = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    self.onCreateContextMenu()
+                }
+            }
+        }
+        super.buildMenu(with: builder)
+    }
+
+    @available(iOS 16.4, *)
+    public func webView(_ webView: WKWebView, willPresentEditMenuWithAnimator animator: UIEditMenuInteractionAnimating) {
+        onCreateContextMenu()
+    }
+
+    @available(iOS 16.4, *)
+    public func webView(_ webView: WKWebView, willDismissEditMenuWithAnimator animator: UIEditMenuInteractionAnimating) {
+        onHideContextMenu()
+    }
+
     public override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
-        if let _ = sender as? UIMenuController {
-            if self.settings?.disableContextMenu == true {
+        var needCheck = sender is UIMenuController
+        if #available(iOS 13.0, *) {
+            needCheck = sender is UIMenuElement || sender is UIMenuController
+        }
+
+        if needCheck {
+            if settings?.disableContextMenu == true {
                 if !onCreateContextMenuEventTriggeredWhenMenuDisabled {
                     // workaround to trigger onCreateContextMenu event as the same on Android
-                    self.onCreateContextMenu()
+                    onCreateContextMenu()
                     onCreateContextMenuEventTriggeredWhenMenuDisabled = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         self.onCreateContextMenuEventTriggeredWhenMenuDisabled = false
@@ -265,10 +307,14 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
 
             if contextMenuIsShowing, !action.description.starts(with: "onContextMenuActionItemClicked-") {
                 let id = action.description.compactMap({ $0.asciiValue?.description }).joined()
-                self.channelDelegate?.onContextMenuActionItemClicked(id: id, title: action.description)
+                channelDelegate?.onContextMenuActionItemClicked(id: id, title: action.description)
+                if #available(iOS 16.0, *) {
+                    if #unavailable(iOS 16.4) {
+                        onHideContextMenu()
+                    }
+                }
             }
         }
-
         return super.canPerformAction(action, withSender: sender)
     }
 
@@ -320,17 +366,19 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
                 context: nil)
         }
 
-        NotificationCenter.default.addObserver(
-                        self,
-                        selector: #selector(onCreateContextMenu),
-                        name: UIMenuController.willShowMenuNotification,
-                        object: nil)
+        if #unavailable(iOS 16.0) {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(onCreateContextMenu),
+                name: UIMenuController.willShowMenuNotification,
+                object: nil)
 
-        NotificationCenter.default.addObserver(
-                        self,
-                        selector: #selector(onHideContextMenu),
-                        name: UIMenuController.didHideMenuNotification,
-                        object: nil)
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(onHideContextMenu),
+                name: UIMenuController.didHideMenuNotification,
+                object: nil)
+        }
 
         // TODO: Still not working on iOS 16.0!
 //        if #available(iOS 16.0, *) {
@@ -427,8 +475,9 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
                 isFindInteractionEnabled = settings.isFindInteractionEnabled
             }
 
-            // debugging is always enabled for iOS,
-            // there isn't any option to set about it such as on Android.
+            if #available(iOS 16.4, *) {
+                isInspectable = settings.isInspectable
+            }
 
             if settings.clearCache {
                 clearCache()
@@ -464,13 +513,15 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
                 configuration.defaultWebpagePreferences.allowsContentJavaScript = settings.javaScriptEnabled
             }
 
-            if #available(iOS 14.5, *) {
+            if #available(iOS 15.0, *) {
                 configuration.preferences.isTextInteractionEnabled = settings.isTextInteractionEnabled
             }
-
             if #available(iOS 15.4, *) {
                 configuration.preferences.isSiteSpecificQuirksModeEnabled = settings.isSiteSpecificQuirksModeEnabled
                 configuration.preferences.isElementFullscreenEnabled = settings.isElementFullscreenEnabled
+            }
+            if #available(iOS 16.4, *) {
+                configuration.preferences.shouldPrintBackgrounds = settings.shouldPrintBackgrounds
             }
         }
     }
@@ -886,9 +937,11 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
     }
 
     public func loadFile(assetFilePath: String) throws {
-        let assetURL = try Util.getUrlAsset(assetFilePath: assetFilePath)
-        let urlRequest = URLRequest(url: assetURL)
-        loadUrl(urlRequest: urlRequest, allowingReadAccessTo: nil)
+        if let plugin = plugin {
+            let assetURL = try Util.getUrlAsset(plugin: plugin, assetFilePath: assetFilePath)
+            let urlRequest = URLRequest(url: assetURL)
+            loadUrl(urlRequest: urlRequest, allowingReadAccessTo: nil)
+        }
     }
 
     func setSettings(newSettings: InAppWebViewSettings, newSettingsMap: [String: Any]) {
@@ -1187,16 +1240,13 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
             }
         }
 
-        if #available(iOS 14.5, *) {
+        if #available(iOS 15.0, *) {
             if newSettingsMap["upgradeKnownHostsToHTTPS"] != nil && settings?.upgradeKnownHostsToHTTPS != newSettings.upgradeKnownHostsToHTTPS {
                 configuration.upgradeKnownHostsToHTTPS = newSettings.upgradeKnownHostsToHTTPS
             }
             if newSettingsMap["isTextInteractionEnabled"] != nil && settings?.isTextInteractionEnabled != newSettings.isTextInteractionEnabled {
                 configuration.preferences.isTextInteractionEnabled = newSettings.isTextInteractionEnabled
             }
-        }
-
-        if #available(iOS 15.0, *) {
             if newSettingsMap["underPageBackgroundColor"] != nil, settings?.underPageBackgroundColor != newSettings.underPageBackgroundColor,
                let underPageBackgroundColor = newSettings.underPageBackgroundColor, !underPageBackgroundColor.isEmpty {
                 self.underPageBackgroundColor = UIColor(hexString: underPageBackgroundColor)
@@ -1214,10 +1264,17 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
                 setMinimumViewportInset(minViewportInset, maximumViewportInset: maxViewportInset)
             }
         }
-
         if #available(iOS 16.0, *) {
             if newSettingsMap["isFindInteractionEnabled"] != nil, settings?.isFindInteractionEnabled != newSettings.isFindInteractionEnabled {
                 isFindInteractionEnabled = newSettings.isFindInteractionEnabled
+            }
+        }
+        if #available(iOS 16.4, *) {
+            if newSettingsMap["isInspectable"] != nil, settings?.isInspectable != newSettings.isInspectable {
+                isInspectable = newSettings.isInspectable
+            }
+            if newSettingsMap["shouldPrintBackgrounds"] != nil, settings?.shouldPrintBackgrounds != newSettings.shouldPrintBackgrounds {
+                configuration.preferences.shouldPrintBackgrounds = newSettings.shouldPrintBackgrounds
             }
         }
 
@@ -1917,8 +1974,8 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
                             completionHandler(.useCredential, credential)
                             break
                         case 2:
-                            if InAppWebView.credentialsProposed.count == 0, let credentialStore = CredentialDatabase.credentialStore {
-                                for (protectionSpace, credentials) in credentialStore.allCredentials {
+                            if InAppWebView.credentialsProposed.count == 0 {
+                                for (protectionSpace, credentials) in CredentialDatabase.credentialStore.allCredentials {
                                     if protectionSpace.host == host && protectionSpace.realm == realm &&
                                     protectionSpace.protocol == prot && protectionSpace.port == port {
                                         for credential in credentials {
@@ -2030,7 +2087,9 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
 
                             var path: String = certificatePath
                             do {
-                                path = try Util.getAbsPathAsset(assetFilePath: certificatePath)
+                                if let plugin = self.plugin {
+                                    path = try Util.getAbsPathAsset(plugin: plugin, assetFilePath: certificatePath)
+                                }
                             } catch {}
 
                             if let PKCS12Data = NSData(contentsOfFile: path),
@@ -2402,10 +2461,14 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
                         createWebViewWith configuration: WKWebViewConfiguration,
                   for navigationAction: WKNavigationAction,
                   windowFeatures: WKWindowFeatures) -> WKWebView? {
-        InAppWebView.windowAutoincrementId += 1
-        let windowId = InAppWebView.windowAutoincrementId
+        var windowId: Int64 = 0
+        let inAppWebViewManager = plugin?.inAppWebViewManager
+        if let inAppWebViewManager = inAppWebViewManager {
+            inAppWebViewManager.windowAutoincrementId += 1
+            windowId = inAppWebViewManager.windowAutoincrementId
+        }
 
-        let windowWebView = InAppWebView(id: nil, registrar: nil, frame: CGRect.zero, configuration: configuration, contextMenu: nil)
+        let windowWebView = InAppWebView(id: nil, plugin: nil, frame: CGRect.zero, configuration: configuration, contextMenu: nil)
         windowWebView.windowId = windowId
 
         let webViewTransport = WebViewTransport(
@@ -2413,7 +2476,7 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
             request: navigationAction.request
         )
 
-        InAppWebView.windowWebViews[windowId] = webViewTransport
+        inAppWebViewManager?.windowWebViews[windowId] = webViewTransport
         windowWebView.stopLoading()
 
         let createWindowAction = CreateWindowAction(navigationAction: navigationAction, windowId: windowId, windowFeatures: windowFeatures, isDialog: nil)
@@ -2423,8 +2486,8 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
             return !handledByClient
         }
         callback.defaultBehaviour = { (handledByClient: Bool?) in
-            if InAppWebView.windowWebViews[windowId] != nil {
-                InAppWebView.windowWebViews.removeValue(forKey: windowId)
+            if inAppWebViewManager?.windowWebViews[windowId] != nil {
+                inAppWebViewManager?.windowWebViews.removeValue(forKey: windowId)
             }
             self.loadUrl(urlRequest: navigationAction.request, allowingReadAccessTo: nil)
         }
@@ -2690,7 +2753,7 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
 
             let _windowId = body["_windowId"] as? Int64
             var webView = self
-            if let wId = _windowId, let webViewTransport = InAppWebView.windowWebViews[wId] {
+            if let wId = _windowId, let webViewTransport = plugin?.inAppWebViewManager?.windowWebViews[wId] {
                 webView = webViewTransport.webView
             }
             webView.channelDelegate?.onConsoleMessage(message: consoleMessage, messageLevel: messageLevel)
@@ -2707,7 +2770,7 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
                         return !handledByClient
                     }
                     callback.defaultBehaviour = { (handledByClient: Bool?) in
-                        if let printJob = PrintJobManager.jobs[printJobId] {
+                        if let printJob = self.plugin?.printJobManager?.jobs[printJobId] {
                             printJob?.disposeNoDismiss()
                         }
                     }
@@ -2725,7 +2788,7 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
 
             let _windowId = body["_windowId"] as? Int64
             var webView = self
-            if let wId = _windowId, let webViewTransport = InAppWebView.windowWebViews[wId] {
+            if let wId = _windowId, let webViewTransport = plugin?.inAppWebViewManager?.windowWebViews[wId] {
                 webView = webViewTransport.webView
             }
 
@@ -2738,7 +2801,7 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
 
                 self.evaluateJavaScript("""
 if(window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)] != null) {
-    window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)](\(json));
+    window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)].resolve(\(json));
     delete window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)];
 }
 """, completionHandler: nil)
@@ -2749,7 +2812,7 @@ if(window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)] != null) {
 
                 self.evaluateJavaScript("""
 if(window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)] != null) {
-    window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)](new Error('\(errorMessage.replacingOccurrences(of: "\'", with: "\\'"))'));
+    window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)].reject(new Error('\(errorMessage.replacingOccurrences(of: "\'", with: "\\'"))'));
     delete window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)];
 }
 """, completionHandler: nil)
@@ -2767,7 +2830,7 @@ if(window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)] != null) {
 
             let _windowId = body["_windowId"] as? Int64
             var webView = self
-            if let wId = _windowId, let webViewTransport = InAppWebView.windowWebViews[wId] {
+            if let wId = _windowId, let webViewTransport = plugin?.inAppWebViewManager?.windowWebViews[wId] {
                 webView = webViewTransport.webView
             }
             webView.findInteractionController?.channelDelegate?.onFindResultReceived(activeMatchOrdinal: activeMatchOrdinal, numberOfMatches: numberOfMatches, isDoneCounting: isDoneCounting)
@@ -2917,9 +2980,9 @@ if(window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)] != null) {
         }
 
         let animated = settings?.animated ?? true
-        if let id = printJobId {
-            let printJob = PrintJobController(id: id, job: printController, settings: settings)
-            PrintJobManager.jobs[id] = printJob
+        if let id = printJobId, let plugin = plugin {
+            let printJob = PrintJobController(plugin: plugin, id: id, job: printController, settings: settings)
+            plugin.printJobManager?.jobs[id] = printJob
             printJob.present(animated: animated, completionHandler: completionHandler)
         } else {
             printController.present(animated: animated, completionHandler: completionHandler)
@@ -3060,9 +3123,13 @@ if(window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)] != null) {
         }
     }
 
-    public func createWebMessageChannel(completionHandler: ((WebMessageChannel) -> Void)? = nil) -> WebMessageChannel {
+    public func createWebMessageChannel(completionHandler: ((WebMessageChannel?) -> Void)? = nil) -> WebMessageChannel? {
+        guard let plugin = plugin else {
+            completionHandler?(nil)
+            return nil
+        }
         let id = NSUUID().uuidString
-        let webMessageChannel = WebMessageChannel(id: id)
+        let webMessageChannel = WebMessageChannel(plugin: plugin, id: id)
         webMessageChannel.initJsInstance(webView: self, completionHandler: completionHandler)
         webMessageChannels[id] = webMessageChannel
 
@@ -3150,8 +3217,8 @@ if(window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)] != null) {
             if #available(iOS 11.0, *) {
                 configuration.userContentController.removeAllContentRuleLists()
             }
-        } else if let wId = windowId, InAppWebView.windowWebViews[wId] != nil {
-            InAppWebView.windowWebViews.removeValue(forKey: wId)
+        } else if let wId = windowId, plugin?.inAppWebViewManager?.windowWebViews[wId] != nil {
+            plugin?.inAppWebViewManager?.windowWebViews.removeValue(forKey: wId)
         }
         configuration.userContentController.dispose(windowId: windowId)
         NotificationCenter.default.removeObserver(self)
@@ -3179,6 +3246,7 @@ if(window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)] != null) {
         SharedLastTouchPointTimestamp.removeValue(forKey: self)
         callAsyncJavaScriptBelowIOS14Results.removeAll()
         super.removeFromSuperview()
+        plugin = nil
     }
 
     deinit {

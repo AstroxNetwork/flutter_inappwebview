@@ -1,3 +1,43 @@
+## 6.0.0-beta.25
+
+- Merged "feat: InAppLocalhostServer decode assets url when loading them" [#1657](https://github.com/pichillilorenzo/flutter_inappwebview/pull/1657) (thanks to [Nirajn2311](https://github.com/Nirajn2311))
+
+## 6.0.0-beta.24+1
+
+- Fixed "Can't compile on Android" [#1691](https://github.com/pichillilorenzo/flutter_inappwebview/issues/1691)
+
+## 6.0.0-beta.24
+
+- Added InAppWebView keep alive feature
+- Added InAppBrowser menu items feature
+- Added `hasJavaScriptHandler`, `hasUserScript`, `hasWebMessageListener` InAppWebViewController methods
+- Added `hideCloseButton`, `hideDefaultMenuItems`, `menuButtonColor` InAppBrowser settings
+- `HeadlessInAppWebView.webViewController` could be `null`
+- Removed `throwIfAlreadyOpened`, `throwIfNotOpened` InAppBrowser methods
+- Removed `throwIfAlreadyOpened`, `throwIfNotOpened` ChromeSafariBrowser methods
+- Merged "fix #1389 #1315 contextMenu ios 13" [#1575](https://github.com/pichillilorenzo/flutter_inappwebview/pull/1575) (thanks to [heralight](https://github.com/heralight))
+- Merged "fix: remove ignored flutter_export_environment.sh" [#1593](https://github.com/pichillilorenzo/flutter_inappwebview/pull/1593) (thanks to [Sunbreak](https://github.com/Sunbreak))
+- Merged "Fix AndroidX migration URL in README.md" [#1529](https://github.com/pichillilorenzo/flutter_inappwebview/pull/1529) (thanks to [cslee](https://github.com/cslee))
+- Merged "InAppBrowser Bugfix/viewgroup index crash" [#1618](https://github.com/pichillilorenzo/flutter_inappwebview/pull/1618) (thanks to [KhatibFX](https://github.com/KhatibFX))
+- Fixed old iOS versions crash "dyld: Library not loaded: /usr/lib/swift/libswiftCoreGraphics.dylib Reason: image not found" (thanks to [guide-flutter](https://github.com/guide-flutter))
+- Fixed `InAppBrowser.show()` possible crash on macOS
+- Fixed missing `windowTitlebarSeparatorStyle`, `windowAlphaValue`, `windowStyleMask`, `windowFrame` macOS settings updates when using `setSettings()`
+- Fixed "iOS and macOS flutter multiple engine" [#1632](https://github.com/pichillilorenzo/flutter_inappwebview/issues/1632)
+
+## 6.0.0-beta.23
+
+- Updated `androidx.webkit:webkit` dependency to `1.6.1`
+- Updated `androidx.browser:browser` dependency to `1.5.0`
+- Updated `androidx.appcompat:appcompat` dependency to `1.6.1`
+- Added support for Android `WebViewFeature.GET_COOKIE_INFO`
+- Added `requestedWithHeaderOriginAllowList` WebView setting for Android
+- Added `isInspectable`, `shouldPrintBackgrounds` WebView settings for iOS and macOS
+- Removed `WebViewFeature.REQUESTED_WITH_HEADER_CONTROL`, `ServiceWorkerController.setRequestedWithHeaderMode()`, `ServiceWorkerController.getRequestedWithHeaderMode()`, `InAppWebViewSettings.requestedWithHeaderMode`
+- Fixed "Build fail with AGP 8.0" [#1643](https://github.com/pichillilorenzo/flutter_inappwebview/issues/1643)
+- Fixed "java.lang.RuntimeException: Unknown feature REQUESTED_WITH_HEADER_CONTROL" [#1611](https://github.com/pichillilorenzo/flutter_inappwebview/issues/1611)
+- Fixed "iOS 16.4 WebDebugging WKWebView.isInspectable" [#1629](https://github.com/pichillilorenzo/flutter_inappwebview/issues/1629)
+- Fixed some `@available` checks for macOS
+
 ## 6.0.0-beta.22
 
 - Updated `window.flutter_inappwebview.callHandler` implementation: if there is an error/exception on Flutter/Dart side, the `callHandler` will reject the JavaScript promise with the error/exception message, so you can catch it also on JavaScript side
