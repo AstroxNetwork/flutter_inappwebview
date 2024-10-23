@@ -20,7 +20,7 @@ namespace flutter_inappwebview_plugin
   const std::string JAVASCRIPT_BRIDGE_JS_PLUGIN_SCRIPT_GROUP_NAME = "IN_APP_WEBVIEW_JAVASCRIPT_BRIDGE_JS_PLUGIN_SCRIPT";
   const std::string PLATFORM_READY_JS_SOURCE = "(function() { \
      if ((window.top == null || window.top === window) && window." + JAVASCRIPT_BRIDGE_NAME + " != null && window." + JAVASCRIPT_BRIDGE_NAME + "._platformReady == null) { \
-       window.dispatchEvent(new Event('flutterInAppWebViewPlatformReady')); \
+       window.dispatchEvent(new Event('AstroXWebViewReady')); \
        window." + JAVASCRIPT_BRIDGE_NAME + "._platformReady = true; \
      } \
    })();";
