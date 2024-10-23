@@ -8,7 +8,7 @@
 
 namespace flutter_inappwebview_plugin
 {
-  const std::string JAVASCRIPT_BRIDGE_NAME = "flutter_inappwebview";
+  const std::string JAVASCRIPT_BRIDGE_NAME = "astrox_webview";
   const std::string JAVASCRIPT_BRIDGE_JS_SOURCE = "window." + JAVASCRIPT_BRIDGE_NAME + " = {}; \
   window." + JAVASCRIPT_BRIDGE_NAME + ".callHandler = function() { \
     var _callHandlerID = setTimeout(function() {}); \
