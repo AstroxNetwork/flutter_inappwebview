@@ -2175,7 +2175,7 @@ public class InAppWebView: WKWebView, WKUIDelegate,
                 
                 self?.evaluateJavaScript("""
 if(window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)] != null) {
-    window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)].resolve(\(json));
+    window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)](\(json));
     delete window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)];
 }
 """, completionHandler: nil)
@@ -2186,7 +2186,7 @@ if(window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)] != null) {
                 
                 self?.evaluateJavaScript("""
 if(window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)] != null) {
-    window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)].reject(new Error('\(errorMessage.replacingOccurrences(of: "\'", with: "\\'"))'));
+    window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)](new Error('\(errorMessage.replacingOccurrences(of: "\'", with: "\\'"))'));
     delete window.\(JAVASCRIPT_BRIDGE_NAME)[\(_callHandlerID)];
 }
 """, completionHandler: nil)

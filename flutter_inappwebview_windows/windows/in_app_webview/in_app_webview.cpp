@@ -638,7 +638,7 @@ namespace flutter_inappwebview_plugin
                   }
 
                   evaluateJavascript("if (window." + JAVASCRIPT_BRIDGE_NAME + "[" + std::to_string(callHandlerID) + "] != null) { \
-                      window." + JAVASCRIPT_BRIDGE_NAME + "[" + std::to_string(callHandlerID) + "].resolve(" + json + "); \
+                      window." + JAVASCRIPT_BRIDGE_NAME + "[" + std::to_string(callHandlerID) + "](" + json + "); \
                       delete window." + JAVASCRIPT_BRIDGE_NAME + "[" + std::to_string(callHandlerID) + "]; \
                     }", ContentWorld::page(), nullptr);
                 };
